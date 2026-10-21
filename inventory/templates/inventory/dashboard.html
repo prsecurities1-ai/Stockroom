@@ -1,0 +1,420 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Inventory overview | Stockroom</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --ink: #182230;
+            --muted: #667085;
+            --line: #e8edf3;
+            --canvas: #f5f7fa;
+            --brand: #3157d5;
+            --navy: #17233d;
+        }
+        body { background: var(--canvas); color: var(--ink); font-size: .94rem; }
+        .sidebar {
+            background: var(--navy);
+            min-height: 100vh;
+            width: 250px;
+            position: fixed;
+            inset: 0 auto 0 0;
+            z-index: 1020;
+        }
+        .brand-mark {
+            align-items: center;
+            background: #2949b2;
+            border-radius: .8rem;
+            color: #fff;
+            display: inline-flex;
+            height: 2.5rem;
+            justify-content: center;
+            width: 2.5rem;
+        }
+        .sidebar .nav-link { color: #b9c3d6; border-radius: .55rem; }
+        .sidebar .nav-link:hover, .sidebar .nav-link.active { background: #263650; color: #fff; }
+        .sidebar .nav-link i { margin-right: .65rem; }
+        .main-content { margin-left: 250px; padding: 2rem; }
+        .surface, .stat-card { background: #fff; border: 1px solid var(--line); border-radius: .9rem; }
+        .stat-card { height: 100%; padding: 1.2rem; }
+        .stat-icon {
+            align-items: center;
+            background: #edf1ff;
+            border-radius: .7rem;
+            color: var(--brand);
+            display: inline-flex;
+            height: 2.6rem;
+            justify-content: center;
+            width: 2.6rem;
+        }
+        .stat-value { font-size: 1.65rem; font-weight: 700; letter-spacing: -.04em; }
+        .muted { color: var(--muted); }
+        .surface-header { border-bottom: 1px solid var(--line); padding: 1.15rem 1.35rem; }
+        .surface-body { padding: 1.35rem; }
+        .table { --bs-table-bg: transparent; margin-bottom: 0; vertical-align: middle; }
+        .table thead th {
+            background: #f8fafc;
+            border-bottom-color: var(--line);
+            color: var(--muted);
+            font-size: .74rem;
+            font-weight: 600;
+            letter-spacing: .045em;
+            text-transform: uppercase;
+            white-space: nowrap;
+        }
+        .table td, .table th { border-color: var(--line); padding: .9rem 1rem; }
+        .product-initial {
+            align-items: center;
+            background: #edf1ff;
+            border-radius: .65rem;
+            color: var(--brand);
+            display: inline-flex;
+            font-weight: 700;
+            height: 2.4rem;
+            justify-content: center;
+            margin-right: .7rem;
+            width: 2.4rem;
+        }
+        .form-control, .form-select { border-color: #d9e0e8; }
+        .form-control:focus, .form-select:focus { border-color: #8097ed; box-shadow: 0 0 0 .2rem #3157d51a; }
+        .modal-content { border: 0; border-radius: 1rem; }
+        .modal-header, .modal-footer { border-color: var(--line); }
+        @media (max-width: 991.98px) {
+            .sidebar { min-height: auto; position: static; width: 100%; }
+            .sidebar .nav { flex-direction: row !important; }
+            .main-content { margin-left: 0; padding: 1.25rem; }
+        }
+    </style>
+</head>
+<body data-open-modal="{{ active_modal }}">
+    <aside class="sidebar d-flex flex-column p-3 p-lg-4">
+        <a href="{% url 'inventory:dashboard' %}" class="d-flex align-items-center gap-3 text-decoration-none mb-4">
+            <span class="brand-mark"><i class="bi bi-box-seam fs-5"></i></span>
+            <span class="text-white fw-semibold fs-5">Stockroom</span>
+        </a>
+        <div class="text-uppercase small fw-semibold mb-2 px-2" style="color:#8997ad;letter-spacing:.08em">Workspace</div>
+        <nav class="nav nav-pills flex-column gap-1">
+            <a class="nav-link active" href="#overview"><i class="bi bi-grid-1x2"></i>Overview</a>
+            <a class="nav-link" href="#products"><i class="bi bi-box"></i>Products</a>
+            <a class="nav-link" href="#categories"><i class="bi bi-tags"></i>Categories</a>
+            <a class="nav-link" href="#low-stock"><i class="bi bi-exclamation-triangle"></i>Low stock</a>
+        </nav>
+        <div class="mt-auto pt-4">
+            <a href="{% url 'admin:index' %}" class="nav-link"><i class="bi bi-gear"></i>Admin panel</a>
+            <div class="border-top mt-3 pt-3 px-2" style="border-color:#34425b!important">
+                <div class="text-white fw-semibold">{% firstof request.user.get_short_name request.user.username "Inventory team" %}</div>
+                <div class="small" style="color:#8997ad">Inventory manager</div>
+            </div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4" id="overview">
+            <div>
+                <div class="muted small mb-1">{% now "l, F j, Y" %}</div>
+                <h1 class="h3 fw-bold mb-1">Inventory overview</h1>
+                <p class="muted mb-0">Track products, stock levels, and categories.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button class="btn btn-outline-secondary" type="button" data-bs-toggle="modal" data-bs-target="#categoryModal">
+                    <i class="bi bi-tag me-1"></i> Add category
+                </button>
+                <button class="btn btn-primary" type="button" data-bs-toggle="modal" data-bs-target="#productModal">
+                    <i class="bi bi-plus-lg me-1"></i> Add product
+                </button>
+            </div>
+        </header>
+
+        {% if messages %}
+            <div class="mb-4" aria-live="polite">
+                {% for message in messages %}
+                    <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <section class="row g-3 mb-4" aria-label="Inventory statistics">
+            <div class="col-12 col-sm-6 col-xl">
+                <article class="stat-card">
+                    <div class="d-flex justify-content-between mb-3"><span class="muted">Active products</span><span class="stat-icon"><i class="bi bi-box"></i></span></div>
+                    <div class="stat-value">{{ total_products }}</div>
+                    <div class="small muted">Products available for sale</div>
+                </article>
+            </div>
+            <div class="col-12 col-sm-6 col-xl">
+                <article class="stat-card">
+                    <div class="d-flex justify-content-between mb-3"><span class="muted">Categories</span><span class="stat-icon"><i class="bi bi-tags"></i></span></div>
+                    <div class="stat-value">{{ total_categories }}</div>
+                    <div class="small muted">Product groupings</div>
+                </article>
+            </div>
+            <div class="col-12 col-sm-6 col-xl">
+                <article class="stat-card">
+                    <div class="d-flex justify-content-between mb-3"><span class="muted">Low stock</span><span class="stat-icon text-warning" style="background:#fff4db"><i class="bi bi-exclamation-triangle"></i></span></div>
+                    <div class="stat-value">{{ low_stock_count }}</div>
+                    <div class="small muted">At or below reorder level</div>
+                </article>
+            </div>
+            <div class="col-12 col-sm-6 col-xl">
+                <article class="stat-card">
+                    <div class="d-flex justify-content-between mb-3"><span class="muted">Units in stock</span><span class="stat-icon text-success" style="background:#e8f7ef"><i class="bi bi-stack"></i></span></div>
+                    <div class="stat-value">{{ total_units }}</div>
+                    <div class="small muted">Across active products</div>
+                </article>
+            </div>
+            <div class="col-12 col-sm-6 col-xl">
+                <article class="stat-card">
+                    <div class="d-flex justify-content-between mb-3"><span class="muted">Stock cost value</span><span class="stat-icon text-info" style="background:#e7f6fa"><i class="bi bi-currency-rupee"></i></span></div>
+                    <div class="stat-value fs-4">₹{{ inventory_value|floatformat:2 }}</div>
+                    <div class="small muted">Cost of active stock on hand</div>
+                </article>
+            </div>
+        </section>
+
+        <section class="surface mb-4" id="products">
+            <div class="surface-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h5 fw-bold mb-1">Products</h2>
+                    <p class="muted small mb-0">Create, update, and manage your stock.</p>
+                </div>
+                <form method="get" action="{% url 'inventory:dashboard' %}" class="d-flex gap-2">
+                    <label class="visually-hidden" for="product-search">Search products</label>
+                    <input class="form-control" id="product-search" name="q" value="{{ query }}" placeholder="Search name, SKU, category">
+                    <button class="btn btn-outline-secondary" type="submit" aria-label="Search products"><i class="bi bi-search"></i></button>
+                </form>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+                    <tbody>
+                    {% for product in products %}
+                        <tr>
+                            <td>
+                                <span class="product-initial">{{ product.name|first|upper }}</span>
+                                <span class="fw-semibold">{{ product.name }}</span>
+                            </td>
+                            <td class="text-nowrap">{{ product.sku }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td class="text-nowrap">₹{{ product.selling_price|floatformat:2 }}</td>
+                            <td>
+                                <span class="fw-semibold {% if product.is_low_stock %}text-danger{% endif %}">{{ product.stock_quantity }}</span>
+                                {% if product.is_low_stock %}<span class="badge text-bg-warning ms-1">Reorder</span>{% endif %}
+                                <div class="small muted">Reorder at {{ product.reorder_level }}</div>
+                            </td>
+                            <td>
+                                {% if product.is_active %}<span class="badge rounded-pill text-bg-success">Active</span>
+                                {% else %}<span class="badge rounded-pill text-bg-secondary">Inactive</span>{% endif %}
+                            </td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-light border" href="{% url 'inventory:product_edit' product.pk %}" aria-label="Edit {{ product.name }}"><i class="bi bi-pencil"></i></a>
+                                <button class="btn btn-sm btn-light border text-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal" data-delete-url="{% url 'inventory:product_delete' product.pk %}" data-delete-name="{{ product.name }}" data-delete-kind="product" aria-label="Delete {{ product.name }}"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="7" class="text-center muted py-5">{% if query %}No products match “{{ query }}”.{% else %}No products yet. Add a product to start managing your inventory.{% endif %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="surface mb-4" id="categories">
+            <div class="surface-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div>
+                    <h2 class="h5 fw-bold mb-1">Categories</h2>
+                    <p class="muted small mb-0">Organize products into useful groups.</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <form method="get" action="{% url 'inventory:dashboard' %}" class="d-flex gap-2">
+                        <label class="visually-hidden" for="category-search">Search categories</label>
+                        <input class="form-control" id="category-search" name="category_q" value="{{ category_query }}" placeholder="Search categories">
+                        <button class="btn btn-outline-secondary" type="submit" aria-label="Search categories"><i class="bi bi-search"></i></button>
+                    </form>
+                    <button class="btn btn-outline-primary text-nowrap" type="button" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="bi bi-plus-lg me-1"></i>Add</button>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Category</th><th>Description</th><th>Products</th><th class="text-end">Actions</th></tr></thead>
+                    <tbody>
+                    {% for category in categories %}
+                        <tr>
+                            <td class="fw-semibold">{{ category.name }}</td>
+                            <td class="muted">{{ category.description|default:"—"|truncatechars:90 }}</td>
+                            <td>{{ category.products_count }}</td>
+                            <td class="text-end text-nowrap">
+                                <a class="btn btn-sm btn-light border" href="{% url 'inventory:category_edit' category.pk %}" aria-label="Edit {{ category.name }}"><i class="bi bi-pencil"></i></a>
+                                <button class="btn btn-sm btn-light border text-danger" type="button" data-bs-toggle="modal" data-bs-target="#deleteModal" data-delete-url="{% url 'inventory:category_delete' category.pk %}" data-delete-name="{{ category.name }}" data-delete-kind="category" aria-label="Delete {{ category.name }}"><i class="bi bi-trash"></i></button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="4" class="text-center muted py-5">{% if category_query %}No categories match “{{ category_query }}”.{% else %}No categories yet. Add a category before creating products.{% endif %}</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="surface mb-4" id="low-stock">
+            <div class="surface-header d-flex justify-content-between align-items-center gap-3">
+                <div>
+                    <h2 class="h5 fw-bold mb-1">Low-stock products</h2>
+                    <p class="muted small mb-0">Active items at or below their reorder level.</p>
+                </div>
+                <span class="badge text-bg-warning">{{ low_stock_count }} items</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Available</th><th>Reorder level</th></tr></thead>
+                    <tbody>
+                    {% for product in low_stock_products %}
+                        <tr>
+                            <td class="fw-semibold">{{ product.name }}</td><td>{{ product.sku }}</td>
+                            <td>{{ product.category.name }}</td><td class="text-danger fw-semibold">{{ product.stock_quantity }}</td>
+                            <td>{{ product.reorder_level }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="5" class="text-center muted py-4">All active products are sufficiently stocked.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        <footer class="text-center small muted py-3">Stockroom Inventory Management</footer>
+    </main>
+
+    <div class="modal fade" id="productModal" tabindex="-1" aria-labelledby="productModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <form method="post" action="{% if editing_product %}{% url 'inventory:product_edit' editing_product.pk %}{% else %}{% url 'inventory:product_create' %}{% endif %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <div><h2 class="modal-title fs-5 fw-bold" id="productModalLabel">{% if editing_product %}Edit product{% else %}Add a product{% endif %}</h2><div class="small muted">Product details and stock information</div></div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if product_form.non_field_errors %}<div class="alert alert-danger">{{ product_form.non_field_errors }}</div>{% endif %}
+                        <div class="row g-3">
+                            <div class="col-md-7">
+                                <label class="form-label" for="{{ product_form.name.id_for_label }}">Product name</label>
+                                {{ product_form.name }}{% for error in product_form.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-5">
+                                <label class="form-label" for="{{ product_form.sku.id_for_label }}">SKU</label>
+                                {{ product_form.sku }}{% for error in product_form.sku.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ product_form.category.id_for_label }}">Category</label>
+                                {{ product_form.category }}{% for error in product_form.category.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="{{ product_form.cost_price.id_for_label }}">Cost price (₹)</label>
+                                {{ product_form.cost_price }}{% for error in product_form.cost_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="{{ product_form.selling_price.id_for_label }}">Selling price (₹)</label>
+                                {{ product_form.selling_price }}{% for error in product_form.selling_price.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="{{ product_form.stock_quantity.id_for_label }}">Stock quantity</label>
+                                {{ product_form.stock_quantity }}{% for error in product_form.stock_quantity.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-md-3">
+                                <label class="form-label" for="{{ product_form.reorder_level.id_for_label }}">Reorder level</label>
+                                {{ product_form.reorder_level }}{% for error in product_form.reorder_level.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="{{ product_form.description.id_for_label }}">Description</label>
+                                {{ product_form.description }}{% for error in product_form.description.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                            <div class="col-12">
+                                <div class="form-check">{{ product_form.is_active }}<label class="form-check-label" for="{{ product_form.is_active.id_for_label }}">Active and available for sale</label></div>
+                                {% for error in product_form.is_active.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">{% if editing_product %}Save changes{% else %}Create product{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="categoryModal" tabindex="-1" aria-labelledby="categoryModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form method="post" action="{% if editing_category %}{% url 'inventory:category_edit' editing_category.pk %}{% else %}{% url 'inventory:category_create' %}{% endif %}">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <div><h2 class="modal-title fs-5 fw-bold" id="categoryModalLabel">{% if editing_category %}Edit category{% else %}Add a category{% endif %}</h2><div class="small muted">Give products a clear grouping</div></div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% if category_form.non_field_errors %}<div class="alert alert-danger">{{ category_form.non_field_errors }}</div>{% endif %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ category_form.name.id_for_label }}">Category name</label>
+                            {{ category_form.name }}{% for error in category_form.name.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                        <div>
+                            <label class="form-label" for="{{ category_form.description.id_for_label }}">Description <span class="muted">(optional)</span></label>
+                            {{ category_form.description }}{% for error in category_form.description.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">{% if editing_category %}Save changes{% else %}Create category{% endif %}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form method="post" id="deleteForm">
+                    {% csrf_token %}
+                    <div class="modal-header">
+                        <h2 class="modal-title fs-5 fw-bold" id="deleteModalLabel">Delete item?</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">Are you sure you want to delete <strong id="deleteItemName"></strong>? This action cannot be undone.</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.querySelectorAll("#productModal input:not([type=checkbox]), #productModal textarea, #productModal select, #categoryModal input, #categoryModal textarea").forEach((field) => {
+            field.classList.add(field.tagName === "SELECT" ? "form-select" : "form-control");
+        });
+        document.querySelectorAll("#productModal input[type=checkbox]").forEach((field) => field.classList.add("form-check-input"));
+
+        const deleteModal = document.getElementById("deleteModal");
+        deleteModal.addEventListener("show.bs.modal", (event) => {
+            const trigger = event.relatedTarget;
+            document.getElementById("deleteForm").action = trigger.dataset.deleteUrl;
+            document.getElementById("deleteItemName").textContent = trigger.dataset.deleteName;
+            document.getElementById("deleteModalLabel").textContent = `Delete ${trigger.dataset.deleteKind}?`;
+        });
+
+        const openModal = document.body.dataset.openModal;
+        if (openModal === "product" || openModal === "category") {
+            bootstrap.Modal.getOrCreateInstance(document.getElementById(`${openModal}Modal`)).show();
+        }
+    </script>
+</body>
+</html>
