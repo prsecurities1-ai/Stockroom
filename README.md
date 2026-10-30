@@ -53,13 +53,20 @@ python manage.py createsuperuser
 
 Follow the prompts to set a username, email (if desired), and password. This account can sign in to Django Admin.
 
-### 5. Start the development server
+### 5. Collect static files and run with WhiteNoise and Gunicorn
 
 ```bash
-python manage.py runserver
+python manage.py collectstatic --noinput
+gunicorn inventory_management.wsgi:application --bind 127.0.0.1:8000 --workers 2 --threads 4
 ```
 
-Open the dashboard at <http://127.0.0.1:8000/>. To manage users and access the Django administration site, visit <http://127.0.0.1:8000/admin/> and sign in with the superuser credentials.
+Open the dashboard at <http://127.0.0.1:8000/>. WhiteNoise serves the collected static files, and Gunicorn runs the Django WSGI application. The local default `DEBUG=True` keeps HTTPS redirects disabled. To manage users, visit <http://127.0.0.1:8000/admin/> and sign in with the superuser credentials.
+
+On Windows, Gunicorn is not supported; use Django's development server instead:
+
+```powershell
+python manage.py runserver
+```
 
 ## Using the dashboard
 
@@ -70,6 +77,23 @@ Open the dashboard at <http://127.0.0.1:8000/>. To manage users and access the D
 - A category assigned to products cannot be deleted until those products are moved or deleted.
 
 The dashboard uses Bootstrap assets from jsDelivr, so those styles and scripts require an internet connection.
+
+## Deploying to Render
+
+The included [`render.yaml`](./render.yaml) configures a Render web service and PostgreSQL database. In Render, create a new Blueprint from this repository and apply the generated configuration. The build command installs dependencies, collects static files for WhiteNoise, and applies database migrations; Gunicorn serves the application.
+
+The Blueprint generates `SECRET_KEY` and configures PostgreSQL through `DATABASE_URL`. Render's filesystem is ephemeral, so the provisioned database keeps inventory data across deploys and restarts. The free PostgreSQL plan has a limited lifetime; choose a supported paid plan for ongoing production data.
+
+For manual deployment, use these commands:
+
+```bash
+pip install -r requirements.txt
+python manage.py collectstatic --no-input
+python manage.py migrate --noinput
+gunicorn inventory_management.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4
+```
+
+Set `SECRET_KEY`, `DATABASE_URL`, and `DEBUG=False` in the service environment. Set `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` only when overriding the Render defaults (comma-separated values).
 
 ## Project structure
 

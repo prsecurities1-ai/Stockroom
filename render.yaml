@@ -1,0 +1,22 @@
+databases:
+  - name: inventory-management-db
+    plan: free
+    databaseName: inventory_management
+    user: inventory_management
+
+services:
+  - type: web
+    name: inventory-management
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate --noinput
+    startCommand: gunicorn inventory_management.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --threads 4
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: inventory-management-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
